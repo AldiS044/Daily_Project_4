@@ -1,0 +1,226 @@
+{% extends "base.html" %}
+{% block title %}Pelacak Alumni{% endblock %}
+{% block page_title %}Pelacak Alumni{% endblock %}
+{% block page_sub %}Lacak keberadaan alumni di media sosial dan data pekerjaan{% endblock %}
+
+{% block content %}
+<!-- Trace All Callout -->
+<div class="callout" style="margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px">
+  <div>
+    <div style="font-family:'Playfair Display',serif;font-size:16px;font-weight:700;margin-bottom:3px">Lacak Semua Sekaligus</div>
+    <div style="font-size:13px;color:var(--text-sub)">Pelacakan batch untuk seluruh <strong>{{ "{:,}".format(total_alumni) }}</strong> alumni (diproses per batch 50)</div>
+  </div>
+  <button onclick="startBatchTrace()" class="btn btn-accent" id="btn-batch">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polygon points="5,3 19,12 5,21"/></svg>
+    Lacak Batch
+  </button>
+</div>
+<div id="batch-progress" style="display:none;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:24px">
+  <div style="display:flex;justify-content:space-between;margin-bottom:8px;font-size:12.5px">
+    <span id="batch-label" style="color:var(--text-sub)">Memulai…</span>
+    <span id="batch-pct" style="font-weight:700">0%</span>
+  </div>
+  <div class="progress-bar-wrap" style="height:7px"><div class="progress-bar-fill" id="batch-bar" style="width:0%"></div></div>
+  <div id="batch-result" style="font-size:12px;color:var(--text-dim);margin-top:8px"></div>
+</div>
+
+<div class="grid-2">
+  <!-- LEFT: search & trace single -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Lacak Per Alumni</span></div>
+    <div class="card-body">
+      <div class="form-group" style="position:relative;margin-bottom:12px">
+        <label class="form-label">Cari Alumni</label>
+        <div style="position:relative">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:13px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-dim);pointer-events:none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="search-input" class="form-control" placeholder="Ketik nama alumni…" style="padding-left:40px" autocomplete="off">
+        </div>
+        <div id="search-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--radius-sm);max-height:260px;overflow-y:auto;z-index:200;box-shadow:var(--shadow-lg)">
+          <div id="dropdown-list"></div>
+        </div>
+      </div>
+
+      <!-- Preview -->
+      <div id="alumni-preview" style="display:none;background:var(--accent-soft);border:1.5px solid rgba(45,91,227,.15);border-radius:var(--radius-sm);padding:14px 16px;margin-bottom:14px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--accent);font-weight:700;margin-bottom:4px">Target</div>
+            <div id="prev-nama" style="font-weight:700;font-size:15px;color:var(--text)"></div>
+            <div id="prev-info" style="font-size:12px;color:var(--text-sub);margin-top:2px"></div>
+          </div>
+          <button onclick="clearSelection()" style="background:none;border:none;cursor:pointer;color:var(--text-dim)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <input type="hidden" id="selected-id">
+
+      <button id="btn-trace" class="btn btn-primary" style="width:100%;justify-content:center" onclick="traceSingle()" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Mulai Pelacakan
+      </button>
+
+      <!-- Platform info -->
+      <div style="margin-top:22px">
+        <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text-dim);font-weight:700;margin-bottom:10px">Data yang Dicari</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          {% for item in ['LinkedIn','Instagram','Facebook','TikTok','Email','No HP','Tempat Kerja','Alamat Kerja','Posisi','Jenis Kerja','Sosmed Kantor'] %}
+          <span class="badge badge-gray">{{ item }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: result + history -->
+  <div style="display:flex;flex-direction:column;gap:22px">
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title">Hasil Pelacakan</span>
+        <span id="result-badge"></span>
+      </div>
+      <div class="card-body">
+        <div id="result-empty" class="empty-state" style="padding:32px 0">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <p>Pilih alumni dan mulai pelacakan</p>
+        </div>
+        <div id="result-content" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><span class="card-title">Riwayat Terbaru</span></div>
+      <div style="max-height:300px;overflow-y:auto">
+        <table>
+          <thead><tr><th>Alumni</th><th>Status</th><th>Posisi</th></tr></thead>
+          <tbody id="history-tbody">
+            {% for r in history %}
+            <tr>
+              <td style="font-weight:600;font-size:13px">{{ r.nama }}</td>
+              <td>{% if r.status=='Ditemukan' %}<span class="badge badge-green" style="font-size:11px">✓</span>{% else %}<span class="badge badge-red" style="font-size:11px">✗</span>{% endif %}</td>
+              <td style="font-size:12px;color:var(--text-sub)">{{ r.posisi or '—' }}</td>
+            </tr>
+            {% endfor %}
+            {% if not history %}<tr><td colspan="3" style="text-align:center;color:var(--text-dim);padding:20px">Belum ada riwayat</td></tr>{% endif %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}<script>
+// Search
+const searchInput = document.getElementById('search-input');
+const dropdown    = document.getElementById('search-dropdown');
+const dropList    = document.getElementById('dropdown-list');
+let searchTimer;
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { dropdown.style.display='none'; return; }
+  searchTimer = setTimeout(async () => {
+    const res = await fetch(`/api/search-alumni?q=${encodeURIComponent(q)}`);
+    const data = await res.json();
+    dropList.innerHTML = '';
+    if (!data.length) { dropList.innerHTML='<div style="padding:14px;font-size:13px;color:var(--text-dim);text-align:center">Tidak ditemukan</div>'; }
+    data.forEach(a => {
+      const div = document.createElement('div');
+      div.style.cssText='padding:11px 16px;cursor:pointer;border-bottom:1.5px solid var(--border);transition:background .1s';
+      div.innerHTML=`<div style="font-weight:600;font-size:13.5px">${a.nama}</div><div style="font-size:11.5px;color:var(--text-sub);margin-top:2px">${a.prodi||''} · ${a.fakultas||''} · NIM: ${a.nim||'—'}</div>`;
+      div.addEventListener('mouseenter',()=>div.style.background='var(--surface2)');
+      div.addEventListener('mouseleave',()=>div.style.background='');
+      div.addEventListener('mousedown',e=>{e.preventDefault();selectAlumni(a);});
+      dropList.appendChild(div);
+    });
+    dropdown.style.display='block';
+  }, 300);
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#search-input') && !e.target.closest('#search-dropdown')) dropdown.style.display='none';
+});
+
+function selectAlumni(a) {
+  document.getElementById('selected-id').value = a.id;
+  searchInput.value = a.nama;
+  dropdown.style.display='none';
+  document.getElementById('btn-trace').disabled = false;
+  document.getElementById('alumni-preview').style.display='block';
+  document.getElementById('prev-nama').textContent = a.nama;
+  document.getElementById('prev-info').textContent = `${a.prodi||''} · ${a.fakultas||''} · NIM: ${a.nim||'—'}`;
+}
+function clearSelection() {
+  document.getElementById('selected-id').value='';
+  searchInput.value=''; searchInput.focus();
+  document.getElementById('alumni-preview').style.display='none';
+  document.getElementById('btn-trace').disabled=true;
+}
+
+async function traceSingle() {
+  const id = document.getElementById('selected-id').value; if(!id) return;
+  const btn = document.getElementById('btn-trace');
+  btn.disabled=true; btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin" width="15" height="15"><path d="M21 12a9 9 0 1 1-6.2-8.56"/></svg> Melacak…`;
+  document.getElementById('result-empty').style.display='block';
+  document.getElementById('result-content').style.display='none';
+  document.getElementById('result-badge').innerHTML='';
+  const res = await fetch(`/api/trace/${id}`,{method:'POST'});
+  const d   = await res.json();
+  document.getElementById('result-empty').style.display='none';
+  document.getElementById('result-content').style.display='block';
+  if (d.status==='Ditemukan') {
+    document.getElementById('result-badge').innerHTML='<span class="badge badge-green">✓ Ditemukan</span>';
+    const r=d.data;
+    let html=`<div style="font-size:13px;font-weight:700;color:var(--green);margin-bottom:16px">✓ Data ${d.alumni} berhasil ditemukan</div>`;
+    const smItems=[['LinkedIn',r.linkedin],['Instagram',r.instagram],['Facebook',r.facebook],['TikTok',r.tiktok]].filter(x=>x[1]);
+    if(smItems.length){ html+=`<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Media Sosial</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px">`; smItems.forEach(([k,v])=>html+=`<a href="${v}" target="_blank" class="badge badge-blue" style="text-decoration:none">${k} ↗</a>`); html+='</div>'; }
+    const rows=[['Email',r.email],['No. HP',r.no_hp],['Tempat Kerja',r.tempat_bekerja],['Alamat Kerja',r.alamat_bekerja],['Posisi',r.posisi],['Jenis Kerja',r.jenis_pekerjaan]].filter(x=>x[1]);
+    if(rows.length){ html+=`<div style="font-size:10.5px;font-weight:700;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px">Data Lainnya</div>`; rows.forEach(([k,v])=>html+=`<div style="display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--text-dim);width:100px;flex-shrink:0;font-size:11.5px;font-weight:700;text-transform:uppercase">${k}</span><span style="font-weight:500">${v}</span></div>`); }
+    html+=`<div style="margin-top:14px"><a href="/alumni/${id}/detail" class="btn btn-accent btn-sm">Lihat Detail →</a></div>`;
+    document.getElementById('result-content').innerHTML=html;
+    addHistory(d.alumni,'Ditemukan',r.posisi); showToast(`${d.alumni} berhasil dilacak!`,'success');
+  } else {
+    document.getElementById('result-badge').innerHTML='<span class="badge badge-red">✗ Tidak Ditemukan</span>';
+    document.getElementById('result-content').innerHTML=`<div style="padding:20px 0;text-align:center"><div style="font-size:13px;font-weight:700;color:var(--red);margin-bottom:8px">Tidak ditemukan</div><div style="font-size:13px;color:var(--text-sub)">Data ${d.alumni} tidak berhasil ditemukan di platform yang dicek.</div></div>`;
+    addHistory(d.alumni,'Tidak Ditemukan',null); showToast(`${d.alumni} tidak ditemukan`,'error');
+  }
+  btn.disabled=false; btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg> Lacak Ulang`;
+}
+
+function addHistory(nama,status,posisi){
+  const tb=document.getElementById('history-tbody');
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td style="font-weight:600;font-size:13px">${nama}</td><td>${status==='Ditemukan'?'<span class="badge badge-green" style="font-size:11px">✓</span>':'<span class="badge badge-red" style="font-size:11px">✗</span>'}</td><td style="font-size:12px;color:var(--text-sub)">${posisi||'—'}</td>`;
+  tb.insertBefore(tr,tb.firstChild);
+}
+
+// Batch trace
+async function startBatchTrace(){
+  const btn=document.getElementById('btn-batch');
+  btn.disabled=true;
+  document.getElementById('batch-progress').style.display='block';
+  // Get first 50 untraced alumni
+  const res=await fetch('/api/search-alumni?q=a');
+  const alumni=await res.json();
+  const ids=alumni.map(a=>a.id);
+  const label=document.getElementById('batch-label');
+  const bar=document.getElementById('batch-bar');
+  const pct=document.getElementById('batch-pct');
+  const result=document.getElementById('batch-result');
+  label.textContent='Memproses…';
+  bar.style.width='30%'; pct.textContent='30%';
+  const r=await fetch('/api/trace-batch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})});
+  const data=await r.json();
+  bar.style.width='100%'; pct.textContent='100%';
+  const found=data.results.filter(x=>x.status==='Ditemukan').length;
+  label.textContent='Selesai!';
+  result.innerHTML=`<span style="color:var(--green);font-weight:600">✓ ${found} ditemukan</span> · <span style="color:var(--red);font-weight:600">✗ ${data.count-found} tidak ditemukan</span> dari ${data.count} alumni diproses`;
+  btn.disabled=false;
+  btn.innerHTML=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><polygon points="5,3 19,12 5,21"/></svg> Lacak Batch Lagi`;
+  showToast(`Batch selesai: ${found} ditemukan`,'success');
+}
+</script>
+<style>@keyframes spin{to{transform:rotate(360deg)}} .spin{animation:spin 1s linear infinite}</style>
+{% endblock %}

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Pengaturan{% endblock %}
+{% block page_title %}Pengaturan{% endblock %}
+{% block page_sub %}Manajemen akun dan pengguna sistem{% endblock %}
+{% block content %}
+<div class="grid-2">
+  <div>
+    <div class="card" style="margin-bottom:22px">
+      <div class="card-header"><span class="card-title">Ganti Password</span></div>
+      <div class="card-body">
+        {% if msg %}<div class="alert alert-{{ msg[0] }}" style="margin-bottom:16px">{{ msg[1] }}</div>{% endif %}
+        <form method="post">
+          <input type="hidden" name="action" value="change_password">
+          <div class="form-group"><label class="form-label">Password Lama</label><input type="password" name="old_password" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Password Baru</label><input type="password" name="new_password" class="form-control" required minlength="6"></div>
+          <button type="submit" class="btn btn-primary">Simpan Password</button>
+        </form>
+      </div>
+    </div>
+    {% if session.role=='admin' %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Tambah Pengguna</span></div>
+      <div class="card-body">
+        <form method="post">
+          <input type="hidden" name="action" value="add_user">
+          <div class="form-group"><label class="form-label">Username</label><input type="text" name="new_username" class="form-control" required></div>
+          <div class="form-group"><label class="form-label">Password</label><input type="password" name="new_password" class="form-control" required minlength="6"></div>
+          <div class="form-group"><label class="form-label">Role</label><select name="new_role" class="form-control"><option value="admin">Admin</option><option value="viewer">Viewer</option></select></div>
+          <button type="submit" class="btn btn-primary">Tambah User</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Daftar Pengguna</span></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Username</th><th>Role</th><th>Dibuat</th><th>Aksi</th></tr></thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td style="font-weight:600">{{ u.username }} {% if u.id==session.user_id %}<span class="badge badge-blue" style="font-size:10px">Anda</span>{% endif %}</td>
+            <td><span class="badge badge-{{ 'purple' if u.role=='admin' else 'gray' }}">{{ u.role }}</span></td>
+            <td style="font-size:12px;color:var(--text-sub)">{{ u.created_at[:10] if u.created_at else '—' }}</td>
+            <td>
+              {% if u.id != session.user_id and session.role=='admin' %}
+              <button onclick="deleteUser({{ u.id }},'{{ u.username }}')" class="btn btn-danger btn-sm">Hapus</button>
+              {% else %}—{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}<script>
+function deleteUser(id,name){
+  if(!confirm(`Hapus user "${name}"?`)) return;
+  fetch(`/users/delete/${id}`,{method:'POST'}).then(r=>r.json()).then(d=>{if(d.success){showToast('User dihapus','success');setTimeout(()=>location.reload(),800);}});
+}
+</script>{% endblock %}

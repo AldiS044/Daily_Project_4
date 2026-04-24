@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Data Alumni{% endblock %}
+{% block page_title %}Data Alumni{% endblock %}
+{% block page_sub %}{{ "{:,}".format(total_rows) }} alumni terdaftar · Halaman {{ page }} dari {{ total_pages }}{% endblock %}
+{% block topbar_action %}<a href="{{ url_for('add_alumni') }}" class="btn btn-primary"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><path d="M12 5v14M5 12h14"/></svg>Tambah Alumni</a>{% endblock %}
+
+{% block content %}
+<form method="get" class="search-bar">
+  <div class="search-input-wrap">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <input type="text" name="q" value="{{ q }}" placeholder="Cari nama alumni…" class="form-control">
+  </div>
+  <select name="fakultas" class="form-control filter-auto" style="width:auto;min-width:200px">
+    <option value="">Semua Fakultas</option>
+    {% for f in fakults %}<option value="{{ f[0] }}" {% if fak_filter==f[0] %}selected{% endif %}>{{ f[0] }}</option>{% endfor %}
+  </select>
+  <select name="status" class="form-control filter-auto" style="width:auto;min-width:160px">
+    <option value="">Semua Status</option>
+    <option value="ditemukan" {% if stat_filter=='ditemukan' %}selected{% endif %}>✓ Ditemukan</option>
+    <option value="tidak" {% if stat_filter=='tidak' %}selected{% endif %}>✗ Tidak Ditemukan</option>
+    <option value="belum" {% if stat_filter=='belum' %}selected{% endif %}>Belum Dilacak</option>
+  </select>
+  <button type="submit" class="btn btn-primary">Cari</button>
+  {% if q or fak_filter or stat_filter %}<a href="{{ url_for('alumni_list') }}" class="btn btn-ghost">Reset</a>{% endif %}
+</form>
+
+<div class="card">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:10px">
+      <span class="card-title">Daftar Alumni</span>
+      <span class="badge badge-blue">{{ "{:,}".format(total_rows) }} data</span>
+    </div>
+  </div>
+  <div class="table-wrap">
+    {% if alumni %}
+    <table>
+      <thead><tr><th>#</th><th>Nama Alumni</th><th>NIM</th><th>Fakultas / Prodi</th><th>Thn Masuk</th><th>Status</th><th style="width:110px">Aksi</th></tr></thead>
+      <tbody>
+        {% for a in alumni %}
+        <tr data-id="{{ a['id'] }}">
+          <td style="color:var(--text-dim);font-size:12px">{{ loop.index + (page-1)*per_page }}</td>
+          <td>
+            <a href="{{ url_for('alumni_detail', id=a['id']) }}" style="font-weight:600;color:var(--text);text-decoration:none;hover:color:var(--accent)">{{ a['nama'] }}</a>
+            <div style="font-size:11px;color:var(--text-dim)">{{ a['universitas'] }}</div>
+          </td>
+          <td><code style="font-size:11px;background:var(--surface2);border:1px solid var(--border);padding:2px 7px;border-radius:5px">{{ a['nim'] or '—' }}</code></td>
+          <td>
+            <div style="font-size:13px;font-weight:500">{{ a['fakultas'] or '—' }}</div>
+            <div style="font-size:11px;color:var(--text-sub)">{{ a['prodi'] or '—' }}</div>
+          </td>
+          <td style="font-weight:500">{{ a['tahun_masuk'] or '—' }}</td>
+          <td>
+            {% if a['t_status']=='Ditemukan' %}<span class="badge badge-green">✓ Ditemukan</span>
+            {% elif a['t_status']=='Tidak Ditemukan' %}<span class="badge badge-red">✗ Tidak Ditemukan</span>
+            {% else %}<span class="badge badge-gray">Belum Dilacak</span>{% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:5px">
+              <a href="{{ url_for('alumni_detail', id=a['id']) }}" class="btn btn-ghost btn-sm" title="Detail">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              </a>
+              <button onclick="deleteAlumni({{ a['id'] }},'{{ a['nama']|replace("'","") }}')" class="btn btn-danger btn-sm" title="Hapus">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3,6 5,6 21,6"/><path d="M19 6l-1 14H6L5 6"/></svg>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <!-- PAGINATION -->
+    {% if total_pages > 1 %}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-top:1.5px solid var(--border);flex-wrap:wrap;gap:10px">
+      <span style="font-size:12.5px;color:var(--text-dim)">Halaman {{ page }} dari {{ total_pages }}</span>
+      <div style="display:flex;gap:6px">
+        {% if page > 1 %}
+        <a href="?q={{ q }}&fakultas={{ fak_filter }}&status={{ stat_filter }}&page={{ page-1 }}" class="btn btn-ghost btn-sm">← Sebelumnya</a>
+        {% endif %}
+        {% for p in range([1,page-2]|max, [total_pages+1,page+3]|min) %}
+        <a href="?q={{ q }}&fakultas={{ fak_filter }}&status={{ stat_filter }}&page={{ p }}" class="btn {% if p==page %}btn-primary{% else %}btn-ghost{% endif %} btn-sm">{{ p }}</a>
+        {% endfor %}
+        {% if page < total_pages %}
+        <a href="?q={{ q }}&fakultas={{ fak_filter }}&status={{ stat_filter }}&page={{ page+1 }}" class="btn btn-ghost btn-sm">Selanjutnya →</a>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <p>Tidak ada alumni yang cocok.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
